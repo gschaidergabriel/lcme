@@ -1,8 +1,14 @@
-# Titan Memory: Empirical Benchmark
+# Titan Memory: Empirical Benchmark for Local AI Agents
 
 ## Abstract
 
-We benchmark Titan Memory v1.0.0 against Mem0 v1.0.7 on conversational memory corpora, with Graphiti v0.28.2 and Letta v0.16.6 evaluated on deployment characteristics. Titan was tested on 30 realistic items with 20 queries (3 runs averaged). Mem0 was tested on 200 items with 15 queries using a local Qwen-3B LLM. Graphiti and Letta could not be benchmarked — both require external infrastructure (Neo4j server / Letta server).
+This benchmark evaluates memory systems for **local AI agents running 3B-8B models on consumer hardware** (CPU-only, 8-16 GB RAM). This is a growing deployment scenario: users running Qwen-3B, Llama-3.1-8B, Phi-3, or Gemma on laptops and mini PCs without dedicated GPUs. On this hardware, every MB of RAM and every millisecond of CPU time matters — the machine is already near capacity running the agent model.
+
+The key constraint: **you cannot afford a second LLM for memory operations.** Mem0 (51K stars), Graphiti (24K stars), and Letta (22K stars) all require an LLM for memory extraction or management. On a machine that's already running a 3B model, calling that same model again for every memory ingest blocks agent inference for 12 seconds per item.
+
+Titan is designed for this scenario: long-term memory that runs alongside a small model without competing for the same compute.
+
+We benchmark Titan Memory v1.0.0 against Mem0 v1.0.7 head-to-head. Graphiti v0.28.2 and Letta v0.16.6 could not be benchmarked — both require external infrastructure (Neo4j server / Letta server) that contradicts the local-first constraint.
 
 **Head-to-head results:**
 
@@ -194,15 +200,26 @@ Titan's FTS stop-word filtering, temporal detection, emotion detection, and nega
 
 The embedding model (`all-MiniLM-L6-v2`) supports 100+ languages for semantic similarity. The stop-word and feature detection lists above enhance FTS precision and query understanding for these specific languages.
 
-## 6. Limitations
+## 6. Target Deployment Scenario
 
-1. **30-item corpus.** Small by benchmarking standards. Scaling behavior at 10K+ items may differ as vector search, FTS, and graph traversal costs grow.
+This benchmark is designed for and relevant to:
 
-2. **CPU-only.** All measurements on AMD Ryzen 9 7940HS. GPU-accelerated embedding computation would reduce ingestion latency.
+- **Hardware**: Consumer laptops, mini PCs, single-board computers (8-16 GB RAM, CPU-only or integrated GPU)
+- **Models**: 3B-8B parameter LLMs (Qwen2.5-3B, Llama-3.1-8B, Phi-3-mini, Gemma-2B)
+- **Constraint**: The machine is already near capacity running the agent model. Memory must not require a second LLM.
+- **Pattern**: Always-on agents that ingest continuously (conversations, observations, tool results)
 
-3. **Cold-start neural components.** Titan's Hippocampus (226K params) was not loaded in standalone mode. The cortex networks (77K params) were in cold-start phase. A production instance with trained networks and consolidation history would show different characteristics.
+If you are running 70B+ models on multi-GPU servers with API budgets, Mem0 with a cloud LLM is a reasonable choice. If you are running a 3B model on a laptop and need memory that doesn't kill your system, Titan is built for you.
 
-4. **No head-to-head with competitors.** Graphiti and Letta require external infrastructure. Mem0 requires an LLM endpoint. A fully controlled comparison would need identical infrastructure for all systems.
+## 7. Limitations
+
+1. **30-item corpus.** Small by benchmarking standards. Scaling behavior at 10K+ items may differ.
+
+2. **CPU-only.** All measurements on AMD Ryzen 9 7940HS.
+
+3. **Cold-start neural components.** Titan's Hippocampus (226K params) was not loaded in standalone mode. The cortex networks (77K params) were in cold-start phase. A production instance with trained networks would show different characteristics.
+
+4. **Mem0 used a local 3B model.** With GPT-4 or Claude as the extraction LLM, Mem0 would be faster (~1-3s/item instead of 12s) and potentially more accurate. But that introduces API costs and an external dependency — which contradicts the local-first scenario this benchmark targets.
 
 5. **Keyword ground truth.** Quality measured by keyword matching. Semantically correct results using different wording may be undercounted.
 

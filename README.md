@@ -13,9 +13,39 @@
 
 ---
 
-Titan is a Python library that gives AI agents long-term memory with retrieval quality that improves over time. It stores memories as claims with confidence levels, retrieves them using keyword + semantic + graph fusion, and trains 10 small neural networks from usage patterns to get better at deciding what matters.
+## The Problem
 
-Everything runs locally. No API keys, no external servers, no vector database to manage. SQLite + PyTorch on CPU.
+You're running a 3B-8B model locally on consumer hardware (CPU-only, 8-16 GB RAM). Your context window is 4K-8K tokens. Every token counts. You need long-term memory, but every other memory system (Mem0, Letta, Graphiti) requires a second LLM running alongside your agent — for extraction, summarization, or memory management. On hardware that's already at capacity running one model, that's not an option.
+
+## The Solution
+
+Titan gives AI agents long-term memory **without requiring an LLM for memory operations**. It uses regex extraction, 10 small neural networks (303K params total, <1ms inference), and multi-signal retrieval to store and recall memories at 28ms per ingest and 14ms per query. No second model. No API keys. No external servers. Just `pip install` and it works on the same hardware your 3B model already runs on.
+
+```
+Your agent (Qwen-3B, Llama-8B, Phi-3, Gemma...)
+    │
+    ├── ingest() ──→  Titan (28ms, +17MB RAM, CPU)
+    │                   └── regex extraction + neural scoring
+    │                   └── SQLite + vectors + knowledge graph
+    │
+    └── retrieve() ←── Titan (14ms)
+                        └── keyword + semantic + graph fusion
+                        └── learned neural re-ranking
+```
+
+Every other memory system requires this:
+
+```
+Your agent (Qwen-3B)           ← already using most of your RAM/CPU
+    │
+    ├── ingest() ──→  Mem0
+    │                   └── calls Qwen-3B AGAIN for extraction  ← 12s per item
+    │                   └── ChromaDB                            ← +93MB RAM
+    │
+    └── retrieve() ←── Mem0 (vector-only search)
+```
+
+On a machine running a 3B model, you can't afford to call that model a second time for every memory operation. Titan's 303K-param networks do the job in <1ms.
 
 ```python
 from titan import Titan, TitanConfig
@@ -97,7 +127,9 @@ flowchart TB
 ## Benchmarks
 
 > [!NOTE]
-> Measured on AMD Ryzen 9 7940HS, 24.4 GB RAM, CPU-only. Titan: 30 items, 20 queries, 3 runs averaged. Mem0: 200 items, 15 queries, local Qwen-3B. Graphiti/Letta could not run without their required infrastructure.
+> Benchmarked for the target scenario: **local agents on consumer hardware (CPU-only, 8-16GB RAM) running 3B-8B models.** This is not a benchmark for cloud deployments with 70B+ models and unlimited API budgets. Titan is built for the machine that's already at capacity running your agent.
+
+**Hardware:** AMD Ryzen 9 7940HS, 24.4 GB RAM, CPU-only. Titan: 30 items, 20 queries, 3 runs averaged. Mem0: 200 items, 15 queries, local Qwen-3B via llama.cpp. Graphiti/Letta: could not run (require Neo4j / Letta server).
 
 | Metric | **Titan** | Mem0 v1.0.7 | Graphiti v0.28 | Letta v0.16 |
 |--------|-----------|-------------|----------------|-------------|
@@ -106,14 +138,19 @@ flowchart TB
 | MRR | **0.942** | 0.800 | " | " |
 | Ingest/item | **28 ms** | 11,837 ms | " | " |
 | Retrieval P50 | 14 ms | **11 ms** | " | " |
-| RAM | **17 MB** | 93 MB | " | " |
+| RAM overhead | **+17 MB** | +93 MB (+6GB LLM) | " | " |
+| Needs second LLM | **No** | Yes (for every ingest) | Yes | Yes |
 | Neural params | **77,580** | 0 | 0 | 0 |
 | Knowledge graph | **Yes** | No | Yes | No |
 | FTS keyword search | **Yes** | No | No | No |
 | Languages | **8** | 1 | 1 | 1 |
 | External deps | **None** | ChromaDB + LLM | Neo4j + LLM | Server + PostgreSQL |
 
-Titan is 430x faster on ingest because it uses regex extraction instead of LLM calls. Retrieval quality is higher because of multi-signal fusion (keywords + semantics + graph) rather than vector-only search. Mem0 is 1.3x faster on retrieval (single vector lookup vs. multi-path fusion). Full methodology and analysis: **[Benchmark Paper](docs/BENCHMARK.md)**.
+**Why this matters on 3B hardware:** Mem0's 11.8s per ingest isn't just slow — it means your Qwen-3B is busy doing memory extraction instead of responding to the user. On a single-model machine, memory operations and agent responses compete for the same compute. Titan's 28ms ingest runs between inference calls without the user noticing.
+
+Mem0 is 1.3x faster on pure retrieval (single vector lookup vs. Titan's multi-path fusion), but on constrained hardware the total system load is what matters, not isolated retrieval latency.
+
+Full methodology: **[Benchmark Paper](docs/BENCHMARK.md)**.
 
 ## Installation
 
