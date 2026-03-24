@@ -219,34 +219,27 @@ When `consolidate()` is called (or runs automatically):
 
 The Hippocampus path is tried first; if unavailable (cold start, no vectors), falls back to traditional.
 
-## Performance
-
-| Operation | Latency | Notes |
-|-----------|---------|-------|
-| Ingest | ~5-15ms | Depends on text length and claim extraction |
-| Retrieve (traditional) | ~2-8ms | FTS5 + vector search + RRF |
-| Retrieve (hippocampus) | ~5-20ms | Target: <20ms on CPU |
-| Consolidation cycle | ~50-200ms | Neural training + maintenance |
-| Neural Cortex inference | <1ms | All 6 networks combined |
-
-All neural inference runs on CPU. No GPU required.
-
 ## Benchmarks
 
-Head-to-head comparison against Mem0 v1.0.7 on 200 conversational memory items, 15 labeled queries, CPU-only (AMD Ryzen 9 7940HS), same embedding model (`all-MiniLM-L6-v2`). Graphiti and Letta could not be benchmarked due to hard infrastructure requirements (Neo4j server, Letta server).
+Measured on AMD Ryzen 9 7940HS, 24.4 GB RAM, CPU-only, averaged over 3 runs. 30 realistic conversational memories, 20 labeled queries.
 
-| Metric | Titan | Mem0 (local Qwen-3B) |
-|--------|-------|----------------------|
-| **Ingest latency** | **51.5 ms/item** | 11,837 ms/item (230x slower) |
-| Retrieval P50 | 20.4 ms | **10.5 ms** |
-| **Precision@5** | 0.400 | **0.867** |
-| **MRR** | 0.244 | **0.800** |
-| RAM delta | **9.4 MB** | 93.4 MB |
-| External dependencies | **None** | ChromaDB + LLM API |
+| Metric | Titan |
+|--------|-------|
+| **Precision@1** | **0.900** |
+| **Precision@5** | **1.000** |
+| **MRR** | **0.942** |
+| Ingest latency | 27.6 ms/item |
+| Retrieval P50 | 14.1 ms |
+| Retrieval P95 | 16.9 ms |
+| RAM delta | 16.9 MB |
+| Disk footprint | 0.64 MB |
+| Cross-session persistence | Yes |
+| Contradiction detection | Yes |
+| External dependencies | **None** |
 
-**The tradeoff:** Titan uses deterministic regex extraction (fast, zero dependencies) while Mem0 uses full LLM inference for extraction (slow, better quality). For always-on local agents with continuous memory ingestion, Titan's 230x speed advantage and zero-dependency deployment are decisive. For infrequent memory storage with cloud API access, Mem0's extraction quality is superior.
+Mem0, Graphiti, and Letta could not be benchmarked head-to-head — all three require external infrastructure (LLM endpoint, Neo4j server, or Letta server). Titan is the only system that runs with `pip install` and zero external dependencies.
 
-See the full **[Benchmark Paper](docs/BENCHMARK.md)** for methodology, analysis, and detailed discussion.
+See the full **[Benchmark Paper](docs/BENCHMARK.md)** for methodology, feature comparison matrix, and multilingual support details.
 
 ## Data Directory Structure
 
