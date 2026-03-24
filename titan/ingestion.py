@@ -251,7 +251,9 @@ class Architect:
                 origin=origin
             )
 
-        # Store entities as nodes
+        # Store entities as graph nodes (NOT in vector store — entity labels
+        # like "Alice" or "Redis" produce misleadingly high cosine similarity
+        # with queries, drowning out the actual memory content nodes)
         for entity in entities:
             node_id = hashlib.sha256(entity.encode()).hexdigest()[:16]
             if not self.sqlite.get_node(node_id):
@@ -260,7 +262,6 @@ class Architect:
                     created_at=now, protected=False,
                     metadata={"origin": origin}
                 ))
-                self.vectors.add(node_id, entity)
 
         # --- Neural Cortex: importance scoring + emotional tagging ---
         _mis_confidence = base_confidence

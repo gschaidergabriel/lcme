@@ -120,30 +120,42 @@ class ContextBuilder:
                  min_confidence: float = MIN_EFFECTIVE_CONFIDENCE) -> List[RetrievedItem]:
         """
         Retrieve relevant items for a query.
-        Combines vector, FTS, and graph signals using RRF.
+        Uses raw similarity scores as primary signal, with confidence/recency
+        as secondary tiebreakers. Entity-only nodes are filtered out.
         """
         if not query or not query.strip():
             return []
 
-        rankings = []
+        # ── Dual-path retrieval: FTS-first + Vector-semantic ──────────
+        #
+        # Key insight: for factual queries with specific keywords ("What port
+        # does auth use?"), FTS is far more precise than vector similarity.
+        # For semantic queries ("Tell me about the infrastructure"), vectors win.
+        #
+        # Strategy: Run both, rank by FTS-rank (keyword precision) when available,
+        # fall back to vector similarity for items FTS doesn't find.
 
-        # 1. Vector similarity search
-        vector_results = self.vectors.search(query, limit=limit * 3)
-        if vector_results:
-            rankings.append(vector_results)
-
-        # 2. FTS search
+        # 1. FTS search — keyword precision, ordered by BM25 rank
         fts_results = self.sqlite.search_fts(query, limit=limit * 3)
+        # Build ordered FTS ranking: position 1 = best match
+        fts_rank = {}
         if fts_results:
-            rankings.append(fts_results)
+            for pos, (nid, _raw_rank) in enumerate(fts_results):
+                fts_rank[nid] = pos  # lower = better
 
-        if not rankings:
+        # 2. Vector similarity search — semantic recall
+        vector_results = self.vectors.search(query, limit=limit * 3)
+        vec_lookup = {}
+        if vector_results:
+            for nid, sim in vector_results:
+                vec_lookup[nid] = sim
+
+        # 3. Merge candidates
+        all_candidates = set(fts_rank.keys()) | set(vec_lookup.keys())
+        if not all_candidates:
             return []
 
-        # 3. Fuse rankings with RRF
-        fused_scores = reciprocal_rank_fusion(rankings)
-
-        # --- Neural Cortex: get cortex once, outside loop ---
+        # --- Neural Cortex ---
         _cortex = None
         try:
             from .neural_cortex import get_cortex
@@ -151,12 +163,27 @@ class ContextBuilder:
         except Exception:
             pass
 
-        # 4. Build retrieved items with enrichment
+        # 4. RRF fusion: combine FTS and vector RANKS (not scores)
+        #    The key fix: all scoring is rank-based. Neither FTS raw scores
+        #    nor vector cosine similarities are used directly — only positions.
+        #    This prevents any single item from dominating via score inflation.
+        #    Confidence and recency are demoted to minor tiebreakers (10% each).
         items = []
-        _last_rwl_weights = [0.4, 0.3, 0.2, 0.1]
-        for node_id, rrf_score in fused_scores.items():
+        _last_rwl_weights = [0.8, 0.08, 0.08, 0.04]
+
+        # Build rank lookups (position 0 = best)
+        vec_ranked = sorted(vec_lookup.items(), key=lambda x: -x[1])
+        vec_rank_map = {nid: pos for pos, (nid, _) in enumerate(vec_ranked)}
+
+        rrf_k = 10  # Lower k = more weight to top positions
+
+        for node_id in all_candidates:
             node = self.sqlite.get_node(node_id)
             if not node:
+                continue
+
+            # Skip entity-only nodes
+            if node.type == "entity" and not node.metadata.get("full_text"):
                 continue
 
             time_decay = calculate_time_decay(node.created_at)
@@ -167,35 +194,28 @@ class ContextBuilder:
                 continue
 
             recency_score = calculate_recency_score(node.created_at)
+            vector_score = vec_lookup.get(node_id, 0.0)
 
-            vector_score = 0.0
-            if vector_results:
-                for nid, score in vector_results:
-                    if nid == node_id:
-                        vector_score = score
-                        break
-
-            fts_score = 0.0
-            if fts_results:
-                for nid, score in fts_results:
-                    if nid == node_id:
-                        fts_score = score
-                        break
+            # RRF: sum of 1/(k+rank) for each ranking list
+            relevance = 0.0
+            if node_id in vec_rank_map:
+                relevance += 1.0 / (rrf_k + vec_rank_map[node_id] + 1)
+            if node_id in fts_rank:
+                relevance += 1.0 / (rrf_k + fts_rank[node_id] + 1)
 
             degree = self.sqlite.get_node_degree(node_id)
             graph_score = min(1.0, degree / 10.0)
 
             content = node.metadata.get("full_text", node.label)
 
-            # Neural Cortex: learned retrieval weights
-            _weights = [0.4, 0.3, 0.2, 0.1]
+            _weights = [0.7, 0.1, 0.1, 0.1]
             if _cortex:
                 try:
                     _rwl_f = {
-                        "rrf": rrf_score, "conf": effective_confidence,
+                        "rrf": relevance, "conf": effective_confidence,
                         "recency": recency_score, "graph": graph_score,
                         "query_len": len(query.split()),
-                        "n_results": len(fused_scores),
+                        "n_results": len(all_candidates),
                         "valence": node.metadata.get("valence", 0.0),
                         "arousal": node.metadata.get("arousal", 0.5),
                     }
@@ -205,7 +225,7 @@ class ContextBuilder:
                     pass
 
             final_score = (
-                rrf_score * _weights[0] +
+                relevance * _weights[0] +
                 effective_confidence * _weights[1] +
                 recency_score * _weights[2] +
                 graph_score * _weights[3]
@@ -218,7 +238,7 @@ class ContextBuilder:
                 effective_confidence=effective_confidence,
                 recency_score=recency_score,
                 vector_score=vector_score,
-                fts_score=fts_score,
+                fts_score=1.0 / (rrf_k + fts_rank.get(node_id, 999) + 1),
                 graph_score=graph_score,
                 final_score=final_score,
                 metadata=node.metadata

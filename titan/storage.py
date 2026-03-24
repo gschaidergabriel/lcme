@@ -384,13 +384,42 @@ class SQLiteStore:
         except Exception as e:
             LOG.error(f"FTS index failed: {e}")
 
+    # Stop words filtered from FTS queries to prevent every item matching
+    _STOP_WORDS = frozenset({
+        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "shall", "can", "need", "dare", "ought",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
+        "into", "about", "between", "through", "during", "before", "after",
+        "above", "below", "up", "down", "out", "off", "over", "under",
+        "and", "but", "or", "nor", "not", "so", "yet", "both", "either",
+        "neither", "each", "every", "all", "any", "few", "more", "most",
+        "other", "some", "such", "no", "only", "own", "same", "than",
+        "too", "very", "just", "because", "if", "when", "where", "how",
+        "what", "which", "who", "whom", "this", "that", "these", "those",
+        "i", "me", "my", "we", "our", "you", "your", "he", "him", "his",
+        "she", "her", "it", "its", "they", "them", "their",
+        "there", "here", "then", "now", "also", "still",
+        # German stop words
+        "der", "die", "das", "ein", "eine", "und", "ist", "sind", "war",
+        "hat", "haben", "wird", "werden", "kann", "mit", "auf", "für",
+        "von", "zu", "den", "dem", "des", "im", "am", "um", "über",
+        "nicht", "auch", "noch", "wie", "was", "wer", "wo", "wann",
+    })
+
     def search_fts(self, query: str, limit: int = 10) -> List[Tuple[str, float]]:
-        """Search using FTS5. Returns (node_id, rank) pairs."""
+        """Search using FTS5 with stop-word filtering. Returns (node_id, rank) pairs."""
         conn = self._get_conn()
         results = []
         try:
             clean_query = re.sub(r'[^\w\s]', ' ', query)
-            words = [w.strip() for w in clean_query.split() if w.strip()]
+            # Filter stop words — without this, queries like "What is Alice role"
+            # become "What OR is OR Alice OR role" and match almost everything
+            words = [w.strip() for w in clean_query.split()
+                     if w.strip() and w.strip().lower() not in self._STOP_WORDS]
+            if not words:
+                # All words were stop words — fall back to unfiltered
+                words = [w.strip() for w in clean_query.split() if w.strip()]
             if not words:
                 return []
             fts_query = ' OR '.join(words)
