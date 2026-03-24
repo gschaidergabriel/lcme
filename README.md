@@ -244,6 +244,27 @@ All neural inference runs on CPU. No GPU required.
     └── titan_hippocampus.pt  # Hippocampus checkpoint (4 networks)
 ```
 
+## Framework Integrations
+
+Titan works with any LLM framework. Two universal patterns:
+
+1. **System prompt augmentation** -- inject `memory.get_context_string(query)` into the system message before each LLM call. Works with every model.
+2. **Tool-based** -- give the LLM `memory_store` / `memory_recall` tools and let it decide when to use them. Requires tool-calling support.
+
+| Framework | Pattern | Example | Guide |
+|-----------|---------|---------|-------|
+| **Claude API** (Anthropic SDK) | `tool_use` loop | [`examples/claude_api.py`](examples/claude_api.py) | [Guide](docs/INTEGRATIONS.md#claude-api-anthropic-sdk) |
+| **Ollama + Python** | System prompt + `[STORE:]` | [`examples/ollama_chat.py`](examples/ollama_chat.py) | [Guide](docs/INTEGRATIONS.md#ollama--python) |
+| **OpenAI-Compatible** (vLLM, LocalAI, Groq, etc.) | System prompt + tools | [`examples/openai_compatible.py`](examples/openai_compatible.py) | [Guide](docs/INTEGRATIONS.md#openai-compatible-apis) |
+| **LangChain** | BaseMemory / LCEL / AgentExecutor | [`examples/langchain_memory.py`](examples/langchain_memory.py) | [Guide](docs/INTEGRATIONS.md#langchain) |
+| **LlamaIndex** | MemoryBlock + Retriever | -- | [Guide](docs/INTEGRATIONS.md#llamaindex) |
+| **CrewAI** | `@tool` decorator | -- | [Guide](docs/INTEGRATIONS.md#crewai) |
+| **AutoGen v0.4** | Memory protocol subclass | -- | [Guide](docs/INTEGRATIONS.md#autogen-v04) |
+| **Pydantic AI** | deps injection + `@agent.tool` | -- | [Guide](docs/INTEGRATIONS.md#pydantic-ai) |
+| **Open Interpreter** | `custom_instructions` | -- | [Guide](docs/INTEGRATIONS.md#open-interpreter) |
+
+See the full **[Integration Guide](docs/INTEGRATIONS.md)** for complete code, gotchas, and install instructions.
+
 ## Origin
 
 Titan was extracted from [Project Frankenstein](https://github.com/gschaidergabriel/Project-Frankenstein), an embodied local AI desktop companion with 76K+ lines of Python. In Frank, Titan serves as the conversational memory backbone -- every conversation, observation, and inference flows through it.
