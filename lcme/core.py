@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Titan Core - E-CPMM v5.1 Orchestrator
+LCME Core - E-CPMM v5.1 Orchestrator
 
-The main coordinator for the Titan Conversational Memory system.
+The main coordinator for the LCME Conversational Memory system.
 
 Leitmotiv: Context is not text. Context is a time-weighted, uncertain
 graph structure that is observed through text.
@@ -33,14 +33,14 @@ from .ingestion import Architect, ExtractionResult
 from .retrieval import Retriever, RetrievedItem, ContextBuilder
 from .maintenance import MaintenanceEngine, PruneStats
 
-LOG = logging.getLogger("titan")
+LOG = logging.getLogger("lcme")
 
 
 @dataclass
-class TitanConfig:
-    """Configuration for Titan memory system."""
+class LCMEConfig:
+    """Configuration for LCME memory system."""
     # Storage
-    data_dir: str = "~/.titan/data"
+    data_dir: str = "~/.lcme/data"
     vector_model: str = "all-MiniLM-L6-v2"
 
     # Retrieval
@@ -64,9 +64,9 @@ class TitanConfig:
         return Path(self.data_dir).expanduser().resolve()
 
 
-class Titan:
+class LCME:
     """
-    Titan - Neural-Enhanced Conversational Memory System.
+    LCME - Neural-Enhanced Conversational Memory System.
 
     Main interface for:
     - Ingesting text into memory
@@ -81,13 +81,13 @@ class Titan:
     - Consolidation engine for periodic training
     """
 
-    def __init__(self, config: TitanConfig = None):
-        self.config = config or TitanConfig()
+    def __init__(self, config: LCMEConfig = None):
+        self.config = config or LCMEConfig()
         self._lock = threading.Lock()
         self._data_dir = self.config.resolved_data_dir()
         _ensure_dir(self._data_dir)
 
-        db_path = self._data_dir / "titan.db"
+        db_path = self._data_dir / "lcme.db"
         model_dir = self._data_dir / "models"
         _ensure_dir(model_dir)
 
@@ -110,7 +110,7 @@ class Titan:
             reset_cortex()  # Clean singleton state
             self._cortex = get_cortex(
                 db_path=db_path,
-                model_path=model_dir / "titan_cortex.pt"
+                model_path=model_dir / "lcme_cortex.pt"
             )
         except Exception as e:
             LOG.debug("Neural Cortex not available: %s", e)
@@ -122,7 +122,7 @@ class Titan:
             reset_hippocampus()
             self._hippocampus = init_hippocampus(
                 data_dir=self._data_dir,
-                titan_db_path=db_path,
+                lcme_db_path=db_path,
                 embed_fn=self.vectors.embed
             )
         except Exception as e:
@@ -146,14 +146,14 @@ class Titan:
             self._consolidation.start_background()
 
         atexit.register(self._shutdown)
-        LOG.info("Titan initialized (data_dir: %s)", self._data_dir)
+        LOG.info("LCME initialized (data_dir: %s)", self._data_dir)
 
     def _start_maintenance_thread(self):
         if self._maintenance_thread is not None:
             return
         self._running = True
         self._maintenance_thread = threading.Thread(
-            target=self._maintenance_loop, daemon=True, name="TitanMaintenance"
+            target=self._maintenance_loop, daemon=True, name="LCMEMaintenance"
         )
         self._maintenance_thread.start()
 
@@ -172,7 +172,7 @@ class Titan:
             self._consolidation.stop()
         try:
             self.vectors.save()
-            LOG.info("Titan shutdown complete")
+            LOG.info("LCME shutdown complete")
         except Exception:
             pass
 
@@ -374,23 +374,23 @@ class Titan:
 # Singleton Access
 # =========================================================================
 
-_titan: Optional[Titan] = None
+_lcme: Optional[LCME] = None
 
 
-def get_titan(config: TitanConfig = None) -> Titan:
-    """Get or create the Titan singleton."""
-    global _titan
-    if _titan is None:
-        _titan = Titan(config)
-    return _titan
+def get_lcme(config: LCMEConfig = None) -> LCME:
+    """Get or create the LCME singleton."""
+    global _lcme
+    if _lcme is None:
+        _lcme = LCME(config)
+    return _lcme
 
 
-def reset_titan():
-    """Reset the Titan singleton (for testing)."""
-    global _titan
-    if _titan is not None:
-        _titan._shutdown()
-        _titan = None
+def reset_lcme():
+    """Reset the LCME singleton (for testing)."""
+    global _lcme
+    if _lcme is not None:
+        _lcme._shutdown()
+        _lcme = None
     # Also reset sub-singletons
     from .neural_cortex import reset_cortex
     from .hippocampus import reset_hippocampus
@@ -400,9 +400,9 @@ def reset_titan():
     reset_cortex()
     reset_hippocampus()
     # Reset module-level singletons
-    import titan.ingestion as _ing
-    import titan.retrieval as _ret
-    import titan.maintenance as _maint
+    import lcme.ingestion as _ing
+    import lcme.retrieval as _ret
+    import lcme.maintenance as _maint
     _ing._architect = None
     _ret._retriever = None
     _maint._engine = None
@@ -414,24 +414,24 @@ def reset_titan():
 
 def remember(text: str, origin: str = "user", confidence: float = 0.8) -> dict:
     """Ingest text into memory."""
-    return get_titan().ingest(text, origin=origin, confidence=confidence)
+    return get_lcme().ingest(text, origin=origin, confidence=confidence)
 
 
 def recall(query: str, limit: int = 5) -> List[dict]:
     """Retrieve relevant context for a query."""
-    return get_titan().retrieve(query, limit=limit)
+    return get_lcme().retrieve(query, limit=limit)
 
 
 def get_context(query: str) -> str:
     """Get assembled context string for a query."""
-    return get_titan().get_context_string(query)
+    return get_lcme().get_context_string(query)
 
 
 def forget(node_id: str) -> bool:
     """Manually forget a node (if not protected)."""
-    return get_titan().forget(node_id)
+    return get_lcme().forget(node_id)
 
 
 def protect(node_id: str) -> bool:
     """Protect a node from pruning."""
-    return get_titan().protect(node_id)
+    return get_lcme().protect(node_id)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Titan Ingestion Pipeline - The Architect
+LCME Ingestion Pipeline - The Architect
 
 Extracts CLAIMS (not facts!) from text.
 
@@ -25,7 +25,7 @@ from .storage import (
     Node, Edge, Claim,
 )
 
-LOG = logging.getLogger("titan.ingestion")
+LOG = logging.getLogger("lcme.ingestion")
 
 
 # Confidence levels by origin
@@ -192,7 +192,7 @@ class Architect:
     """
     The Architect - Main ingestion pipeline.
 
-    Processes text -> extracts claims -> stores in Titan.
+    Processes text -> extracts claims -> stores in LCME.
     """
 
     def __init__(self, sqlite: SQLiteStore, vectors: VectorStore,

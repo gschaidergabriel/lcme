@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Titan Consolidation Engine
+LCME Consolidation Engine
 
-Self-contained training cycle for Titan's neural components.
+Self-contained training cycle for LCME's neural components.
 
 When integrated into a larger system, consolidation can be triggered externally
 (e.g., during idle phases or a dream/sleep cycle). In standalone mode, this
@@ -20,19 +20,19 @@ import threading
 import time
 from typing import Any, Dict, Optional
 
-LOG = logging.getLogger("titan.consolidation")
+LOG = logging.getLogger("lcme.consolidation")
 
 
 class ConsolidationEngine:
-    """Self-contained training cycle for Titan's neural components."""
+    """Self-contained training cycle for LCME's neural components."""
 
-    def __init__(self, titan: Any, interval_hours: float = 6):
+    def __init__(self, lcme: Any, interval_hours: float = 6):
         """
         Args:
-            titan: Titan instance
+            lcme: LCME instance
             interval_hours: How often to run consolidation (default: every 6 hours)
         """
-        self._titan = titan
+        self._lcme = lcme
         self._interval_s = interval_hours * 3600
         self._thread: Optional[threading.Thread] = None
         self._running = False
@@ -81,7 +81,7 @@ class ConsolidationEngine:
 
         # 3. Maintenance
         try:
-            maint_stats = self._titan.maintenance.run_maintenance(force=True)
+            maint_stats = self._lcme.maintenance.run_maintenance(force=True)
             stats["maintenance"] = maint_stats.to_dict()
             LOG.info("Maintenance complete")
         except Exception as e:
@@ -90,7 +90,7 @@ class ConsolidationEngine:
 
         # 4. Save vectors
         try:
-            self._titan.vectors.save()
+            self._lcme.vectors.save()
         except Exception:
             pass
 
@@ -115,7 +115,7 @@ class ConsolidationEngine:
         self._thread = threading.Thread(
             target=self._background_loop,
             daemon=True,
-            name="TitanConsolidation"
+            name="LCMEConsolidation"
         )
         self._thread.start()
         LOG.info("Background consolidation started (interval: %.1fh)",

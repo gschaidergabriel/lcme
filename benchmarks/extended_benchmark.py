@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Extended Titan Benchmark: nDCG, Recall@K, Forgetting, Contradiction, Concurrent, Memory Growth"""
+"""Extended LCME Benchmark: nDCG, Recall@K, Forgetting, Contradiction, Concurrent, Memory Growth"""
 import gc, json, math, os, random, shutil, statistics, sys, tempfile, threading, time
 from pathlib import Path
 
-sys.path.insert(0, '/home/ai-core-node/titan-memory')
+sys.path.insert(0, '/home/ai-core-node/lcme')
 random.seed(42)
 
 # ── Data Generation ─────────────────────────────────────────
@@ -63,13 +63,13 @@ def disk_mb(p):
         if f.is_file(): t+=f.stat().st_size
     return t/1e6
 
-def fresh_titan(data_dir):
+def fresh_lcme(data_dir):
     for mod in list(sys.modules.keys()):
-        if 'titan' in mod: del sys.modules[mod]
-    from titan import Titan, TitanConfig
-    from titan.core import reset_titan
-    reset_titan()
-    return Titan(TitanConfig(data_dir=data_dir))
+        if 'lcme' in mod: del sys.modules[mod]
+    from lcme import LCME, LCMEConfig
+    from lcme.core import reset_lcme
+    reset_lcme()
+    return LCME(LCMEConfig(data_dir=data_dir))
 
 def is_relevant(text, keywords):
     t = text.lower()
@@ -80,7 +80,7 @@ def count_relevant(items_texts, keywords):
     return sum(1 for t in items_texts if is_relevant(t, keywords))
 
 print("="*65)
-print("  TITAN EXTENDED BENCHMARK")
+print("  LCME EXTENDED BENCHMARK")
 print("="*65)
 
 ALL = {}
@@ -90,7 +90,7 @@ ALL = {}
 # ══════════════════════════════════════════════════════════════
 print("\n── 1. RECALL@K ──")
 d = tempfile.mkdtemp()
-t = fresh_titan(os.path.join(d, 'recall'))
+t = fresh_lcme(os.path.join(d, 'recall'))
 for text in data_1200[:500]: t.ingest(text, origin="user")
 
 recall_at = {1:[], 3:[], 5:[], 10:[]}
@@ -110,7 +110,7 @@ for k in [1,3,5,10]:
     ALL[f"recall_at_{k}"] = round(v, 3)
     print(f"  Recall@{k:<3} = {v:.3f}")
 
-from titan.core import reset_titan; reset_titan()
+from lcme.core import reset_lcme; reset_lcme()
 shutil.rmtree(d, ignore_errors=True); gc.collect()
 
 # ══════════════════════════════════════════════════════════════
@@ -118,7 +118,7 @@ shutil.rmtree(d, ignore_errors=True); gc.collect()
 # ══════════════════════════════════════════════════════════════
 print("\n── 2. nDCG@5 ──")
 d = tempfile.mkdtemp()
-t = fresh_titan(os.path.join(d, 'ndcg'))
+t = fresh_lcme(os.path.join(d, 'ndcg'))
 for text in data_1200[:500]: t.ingest(text, origin="user")
 
 ndcg_scores = []
@@ -138,14 +138,14 @@ avg_ndcg = statistics.mean(ndcg_scores)
 ALL["ndcg_at_5"] = round(avg_ndcg, 3)
 print(f"  nDCG@5 = {avg_ndcg:.3f}")
 
-reset_titan(); shutil.rmtree(d, ignore_errors=True); gc.collect()
+reset_lcme(); shutil.rmtree(d, ignore_errors=True); gc.collect()
 
 # ══════════════════════════════════════════════════════════════
 # 3. MEMORY GROWTH (RAM + Disk vs item count)
 # ══════════════════════════════════════════════════════════════
 print("\n── 3. MEMORY GROWTH ──")
 d = tempfile.mkdtemp()
-t = fresh_titan(os.path.join(d, 'growth'))
+t = fresh_lcme(os.path.join(d, 'growth'))
 growth = {}
 rss0 = rss_mb()
 for i, text in enumerate(data_1200[:1000]):
@@ -156,14 +156,14 @@ for i, text in enumerate(data_1200[:1000]):
         growth[i+1] = {"ram_mb": round(rss_now - rss0, 1), "disk_mb": round(disk, 2)}
         print(f"  {i+1:>5} items: RAM +{growth[i+1]['ram_mb']}MB, Disk {growth[i+1]['disk_mb']}MB")
 ALL["memory_growth"] = growth
-reset_titan(); shutil.rmtree(d, ignore_errors=True); gc.collect()
+reset_lcme(); shutil.rmtree(d, ignore_errors=True); gc.collect()
 
 # ══════════════════════════════════════════════════════════════
 # 4. WRITE THROUGHPUT (sustained ingest rate)
 # ══════════════════════════════════════════════════════════════
 print("\n── 4. WRITE THROUGHPUT ──")
 d = tempfile.mkdtemp()
-t = fresh_titan(os.path.join(d, 'write'))
+t = fresh_lcme(os.path.join(d, 'write'))
 # Warmup
 t.ingest("warmup", origin="user"); t.retrieve("warmup")
 
@@ -183,14 +183,14 @@ ALL["write_throughput"] = {
 print(f"  Avg: {ALL['write_throughput']['avg_ms_per_item']}ms/item")
 print(f"  P50: {ALL['write_throughput']['p50_ms']}ms  P95: {ALL['write_throughput']['p95_ms']}ms")
 print(f"  Throughput: {ALL['write_throughput']['items_per_sec']} items/sec")
-reset_titan(); shutil.rmtree(d, ignore_errors=True); gc.collect()
+reset_lcme(); shutil.rmtree(d, ignore_errors=True); gc.collect()
 
 # ══════════════════════════════════════════════════════════════
 # 5. CONCURRENT ACCESS (agent reads while ingesting)
 # ══════════════════════════════════════════════════════════════
 print("\n── 5. CONCURRENT ACCESS ──")
 d = tempfile.mkdtemp()
-t = fresh_titan(os.path.join(d, 'conc'))
+t = fresh_lcme(os.path.join(d, 'conc'))
 for text in data_1200[:200]: t.ingest(text, origin="user")
 
 write_errors, read_errors = [], []
@@ -235,7 +235,7 @@ print(f"  1 writer (100 ops) + 2 readers ({len(read_times)} ops)")
 print(f"  Total: {round(total_ms)}ms")
 print(f"  Write errors: {len(write_errors)}, Read errors: {len(read_errors)}")
 print(f"  Write avg: {ALL['concurrent']['write_avg_ms']}ms, Read avg: {ALL['concurrent']['read_avg_ms']}ms")
-reset_titan(); shutil.rmtree(d, ignore_errors=True); gc.collect()
+reset_lcme(); shutil.rmtree(d, ignore_errors=True); gc.collect()
 
 # ══════════════════════════════════════════════════════════════
 # 6. CONTRADICTION BENCHMARK (10 contradiction pairs)
@@ -275,7 +275,7 @@ contradictions = [
 ]
 
 d = tempfile.mkdtemp()
-t = fresh_titan(os.path.join(d, 'contra'))
+t = fresh_lcme(os.path.join(d, 'contra'))
 # Add some background noise
 for text in data_1200[:100]: t.ingest(text, origin="user")
 
@@ -293,14 +293,14 @@ for old, new, query, expected in contradictions:
 ALL["contradiction"] = {"total": len(contradictions), "passed": hits,
                          "rate": round(hits/len(contradictions), 2)}
 print(f"  Score: {hits}/{len(contradictions)} ({hits/len(contradictions)*100:.0f}%)")
-reset_titan(); shutil.rmtree(d, ignore_errors=True); gc.collect()
+reset_lcme(); shutil.rmtree(d, ignore_errors=True); gc.collect()
 
 # ══════════════════════════════════════════════════════════════
 # 7. FORGETTING EVALUATION (does maintenance prune correctly?)
 # ══════════════════════════════════════════════════════════════
 print("\n── 7. FORGETTING EVALUATION ──")
 d = tempfile.mkdtemp()
-t = fresh_titan(os.path.join(d, 'forget'))
+t = fresh_lcme(os.path.join(d, 'forget'))
 
 # Ingest 100 items
 for text in data_1200[:100]: t.ingest(text, origin="user")
@@ -343,14 +343,14 @@ print(f"  Nodes before maintenance: {stats_before['nodes']}")
 print(f"  Nodes after maintenance: {stats_after['nodes']}")
 print(f"  Manual forget: {'PASS' if forget_ok else 'FAIL'}")
 print(f"  Protection blocks forget: {'PASS' if protect_works else 'FAIL'}")
-reset_titan(); shutil.rmtree(d, ignore_errors=True); gc.collect()
+reset_lcme(); shutil.rmtree(d, ignore_errors=True); gc.collect()
 
 # ══════════════════════════════════════════════════════════════
 # 8. LONG CONVERSATION SIMULATION
 # ══════════════════════════════════════════════════════════════
 print("\n── 8. LONG CONVERSATION (200 turns) ──")
 d = tempfile.mkdtemp()
-t = fresh_titan(os.path.join(d, 'conv'))
+t = fresh_lcme(os.path.join(d, 'conv'))
 
 # Simulate 200 conversation turns
 conv_data = [
@@ -401,12 +401,12 @@ ALL["long_conversation"] = {
 }
 print(f"  200 turns, querying facts from first 10 turns:")
 print(f"  P@1={h1/nq:.3f}  P@5={h5/nq:.3f}  MRR={mrr/nq:.3f}")
-reset_titan(); shutil.rmtree(d, ignore_errors=True)
+reset_lcme(); shutil.rmtree(d, ignore_errors=True)
 
 # ══════════════════════════════════════════════════════════════
 # SAVE + SUMMARY
 # ══════════════════════════════════════════════════════════════
-with open('/home/ai-core-node/titan-memory/benchmarks/extended_results.json', 'w') as f:
+with open('/home/ai-core-node/lcme/benchmarks/extended_results.json', 'w') as f:
     json.dump(ALL, f, indent=2, default=str)
 
 print(f"\n{'='*65}")

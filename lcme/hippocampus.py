@@ -1,7 +1,7 @@
 """
-Hippocampus -- Neural Retrieval Enhancement Layer for Titan
+Hippocampus -- Neural Retrieval Enhancement Layer for LCME
 ===========================================================
-Bio-inspired associative memory that transforms Titan from a database
+Bio-inspired associative memory that transforms LCME from a database
 into something closer to remembering.
 
 Architecture (4 neural modules, ~226K params, <20ms on CPU):
@@ -37,7 +37,7 @@ try:
 except ImportError:
     HAS_TORCH = False
 
-LOG = logging.getLogger("titan.hippocampus")
+LOG = logging.getLogger("lcme.hippocampus")
 
 
 # ====================================================================
@@ -518,14 +518,14 @@ def _extract_node_meta(node: Dict, query_valence: float = 0.0,
 # ====================================================================
 
 class Hippocampus:
-    """Neural retrieval enhancement layer for Titan."""
+    """Neural retrieval enhancement layer for LCME."""
 
-    def __init__(self, data_dir: Path, titan_db_path: Path,
+    def __init__(self, data_dir: Path, lcme_db_path: Path,
                  embed_fn=None):
         """
         Args:
             data_dir: Directory for hippocampus data (models, DB)
-            titan_db_path: Path to the main titan.db
+            lcme_db_path: Path to the main lcme.db
             embed_fn: Callable(text) -> np.ndarray for embedding text.
                      If None, uses SentenceTransformer directly.
         """
@@ -533,13 +533,13 @@ class Hippocampus:
             raise RuntimeError("PyTorch required for Hippocampus")
 
         self._data_dir = data_dir
-        self._titan_db_path = titan_db_path
+        self._lcme_db_path = lcme_db_path
         self._embed_fn = embed_fn
         self._model_dir = data_dir / "models"
-        self._model_path = self._model_dir / "titan_hippocampus.pt"
+        self._model_path = self._model_dir / "lcme_hippocampus.pt"
         self._db_path = data_dir / "hippocampus.db"
-        self._vectors_path = data_dir / "titan_vectors.npz"
-        self._vector_ids_path = data_dir / "titan_vector_ids.json"
+        self._vectors_path = data_dir / "lcme_vectors.npz"
+        self._vector_ids_path = data_dir / "lcme_vector_ids.json"
 
         self._lock = threading.RLock()
         self._net = HippocampusNet()
@@ -1114,7 +1114,7 @@ class Hippocampus:
 
     def refresh_node_cache(self):
         try:
-            conn = sqlite3.connect(str(self._titan_db_path), timeout=3)
+            conn = sqlite3.connect(str(self._lcme_db_path), timeout=3)
             rows = conn.execute(
                 "SELECT id, type, label, created_at, protected, metadata FROM nodes"
             ).fetchall()
@@ -1346,13 +1346,13 @@ def get_hippocampus() -> Optional[Hippocampus]:
     return _instance
 
 
-def init_hippocampus(data_dir: Path, titan_db_path: Path,
+def init_hippocampus(data_dir: Path, lcme_db_path: Path,
                      embed_fn=None) -> Hippocampus:
     """Initialize the hippocampus singleton."""
     global _instance
     with _instance_lock:
         if _instance is None:
-            _instance = Hippocampus(data_dir, titan_db_path, embed_fn)
+            _instance = Hippocampus(data_dir, lcme_db_path, embed_fn)
     return _instance
 
 

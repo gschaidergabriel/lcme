@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Titan Memory + llama-server / Local OpenAI-Compatible Endpoint
+LCME Memory + llama-server / Local OpenAI-Compatible Endpoint
 ===============================================================
 
 Works with any local server that exposes /v1/chat/completions:
@@ -15,14 +15,14 @@ Start your model:
     llama-server -m ./qwen2.5-3b-instruct-q4_k_m.gguf -c 4096 --port 8080
 
 Then run this script:
-    pip install openai titan-memory
+    pip install openai lcme
     python openai_compatible.py
 """
 
 import json
 import sys
 from openai import OpenAI
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
 
 # ── Configuration ────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ client = OpenAI(
 )
 MODEL = "qwen2.5-3b"  # Model name from your server
 
-titan = Titan(TitanConfig(data_dir="./agent_memory"))
+lcme = LCME(LCMEConfig(data_dir="./agent_memory"))
 
 
 # ── Memory tool definitions ──────────────────────────────────────────────
@@ -61,10 +61,10 @@ def execute_tool(tool_call) -> str:
     name = tool_call.function.name
     args = json.loads(tool_call.function.arguments)
     if name == "memory_store":
-        r = titan.ingest(args["text"], origin="user")
+        r = lcme.ingest(args["text"], origin="user")
         return f"Stored: {r['claims']} claims, {r['entities']} entities"
     elif name == "memory_recall":
-        return titan.get_context_string(args["query"])
+        return lcme.get_context_string(args["query"])
     return f"Unknown tool: {name}"
 
 
@@ -72,7 +72,7 @@ def execute_tool(tool_call) -> str:
 
 def chat(user_message: str, history: list) -> str:
     # Inject memory context into system prompt
-    context = titan.get_context_string(user_message)
+    context = lcme.get_context_string(user_message)
     system = {"role": "system", "content": f"You are a helpful assistant.\n\n{context}"}
 
     history.append({"role": "user", "content": user_message})
@@ -105,7 +105,7 @@ def chat(user_message: str, history: list) -> str:
     history.append({"role": "assistant", "content": reply})
 
     # Store conversation
-    titan.ingest(f"User: {user_message}", origin="user")
+    lcme.ingest(f"User: {user_message}", origin="user")
 
     return reply
 
@@ -113,7 +113,7 @@ def chat(user_message: str, history: list) -> str:
 # ── Interactive loop ─────────────────────────────────────────────────────
 
 def main():
-    print(f"Titan Memory + {MODEL} (type 'quit' to exit, 'stats' for memory stats)")
+    print(f"LCME Memory + {MODEL} (type 'quit' to exit, 'stats' for memory stats)")
     print("-" * 60)
     history = []
     while True:
@@ -126,7 +126,7 @@ def main():
         if user_input.lower() == "quit":
             break
         if user_input.lower() == "stats":
-            print(titan.get_stats())
+            print(lcme.get_stats())
             continue
 
         reply = chat(user_input, history)

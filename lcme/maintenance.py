@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Titan Maintenance Layer - Pruning & Aging
+LCME Maintenance Layer - Pruning & Aging
 
 Handles:
 1. Time-based confidence decay
@@ -27,7 +27,7 @@ from typing import Dict, List, Optional, Tuple
 
 from .storage import SQLiteStore, VectorStore, KnowledgeGraph, Node
 
-LOG = logging.getLogger("titan.maintenance")
+LOG = logging.getLogger("lcme.maintenance")
 
 
 # Pruning thresholds

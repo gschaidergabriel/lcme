@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Basic usage example for Titan Memory.
+Basic usage example for LCME Memory.
 
 Demonstrates the core API: ingest, retrieve, get_context_string, protect, forget.
 """
 
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
 
 def main():
     # Initialize with a custom data directory
-    config = TitanConfig(data_dir="./my_agent_memory")
-    memory = Titan(config)
+    config = LCMEConfig(data_dir="./my_agent_memory")
+    memory = LCME(config)
 
     # ── Ingest memories ──────────────────────────────────────────
     print("Ingesting memories...")

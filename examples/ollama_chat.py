@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Titan Memory + Ollama Integration
+LCME Memory + Ollama Integration
 ==================================
 
-Ollama with Titan memory via system prompt augmentation.
+Ollama with LCME memory via system prompt augmentation.
 
 This is the simplest and most reliable pattern. Before each LLM call,
 relevant memories are retrieved and injected into the system message.
@@ -13,7 +13,7 @@ to save new information.
 Works with any Ollama model -- no tool-calling support required.
 
 Requirements:
-    pip install ollama titan-memory
+    pip install ollama lcme
 
 Environment:
     Ollama must be running locally (default: http://localhost:11434).
@@ -22,12 +22,12 @@ Environment:
 
 import re
 import ollama
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
 
 # ── Initialize ────────────────────────────────────────────────────────────────
 
-titan = Titan(TitanConfig(data_dir="./ollama_memory"))
+lcme = LCME(LCMEConfig(data_dir="./ollama_memory"))
 
 
 # ── Chat with system prompt augmentation ─────────────────────────────────────
@@ -38,7 +38,7 @@ def chat_with_memory(
     model: str = "llama3.1:8b"
 ) -> str:
     """
-    Send a message to Ollama with Titan memory context injected.
+    Send a message to Ollama with LCME memory context injected.
 
     Memory is injected as a [MEMORY] block in the system prompt.
     The model can request storage by including [STORE: <text>] in its response.
@@ -55,8 +55,8 @@ def chat_with_memory(
     if messages is None:
         messages = []
 
-    # Retrieve relevant context from Titan
-    memory_block = titan.get_context_string(user_message)
+    # Retrieve relevant context from LCME
+    memory_block = lcme.get_context_string(user_message)
 
     system_msg = (
         "You are a helpful assistant with long-term memory.\n\n"
@@ -78,11 +78,11 @@ def chat_with_memory(
     # Parse [STORE: ...] directives from response and ingest them
     stores = re.findall(r'\[STORE:\s*(.+?)\]', reply)
     for text in stores:
-        result = titan.ingest(text, origin="inference")
-        print(f"  [Titan] Stored: {text[:60]}... ({result['claims']} claims)")
+        result = lcme.ingest(text, origin="inference")
+        print(f"  [LCME] Stored: {text[:60]}... ({result['claims']} claims)")
 
     # Always store the user's message
-    titan.ingest(f"User said: {user_message}", origin="user")
+    lcme.ingest(f"User said: {user_message}", origin="user")
 
     # Update conversation history
     messages.append({"role": "user", "content": user_message})
@@ -96,7 +96,7 @@ def chat_with_memory(
 def main():
     conversation = []
 
-    print("Titan Memory + Ollama Chat")
+    print("LCME Memory + Ollama Chat")
     print("Type 'quit' to exit, 'stats' for memory stats, 'consolidate' to train.\n")
 
     while True:
@@ -106,13 +106,13 @@ def main():
         if user_input.lower() == "quit":
             break
         if user_input.lower() == "stats":
-            stats = titan.get_stats()
-            print(f"  [Titan] Nodes: {stats['nodes']}, Edges: {stats['edges']}, "
+            stats = lcme.get_stats()
+            print(f"  [LCME] Nodes: {stats['nodes']}, Edges: {stats['edges']}, "
                   f"Vectors: {stats['vectors']}")
             continue
         if user_input.lower() == "consolidate":
-            result = titan.consolidate()
-            print(f"  [Titan] Consolidation: {result}")
+            result = lcme.consolidate()
+            print(f"  [LCME] Consolidation: {result}")
             continue
 
         reply = chat_with_memory(user_input, conversation)

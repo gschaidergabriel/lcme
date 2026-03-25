@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Titan Retrieval Layer - Context Builder
+LCME Retrieval Layer - Context Builder
 
 Retrieves and ranks relevant context using:
 1. Reciprocal Rank Fusion (RRF) for multi-signal ranking
@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from .storage import SQLiteStore, VectorStore, KnowledgeGraph, Node
 
-LOG = logging.getLogger("titan.retrieval")
+LOG = logging.getLogger("lcme.retrieval")
 
 # Time decay constants
 DECAY_HALF_LIFE_DAYS = 7

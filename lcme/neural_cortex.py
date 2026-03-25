@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Titan Neural Cortex -- Living Memory System
+LCME Neural Cortex -- Living Memory System
 
-Matrix of 6 micro-networks (~77K total params, CPU-only) that make Titan
+Matrix of 6 micro-networks (~77K total params, CPU-only) that make LCME
 a living intelligent organism instead of a rigid artifact.
 
 Modules:
@@ -15,7 +15,7 @@ Modules:
   ID   -- Interference Detector        (~25K params)
 
 Training: Consolidation phase, <100ms per cycle.
-Cold start: All modules return current Titan defaults until sufficient data.
+Cold start: All modules return current LCME defaults until sufficient data.
 """
 
 import atexit
@@ -39,7 +39,7 @@ try:
 except ImportError:
     HAS_TORCH = False
 
-LOG = logging.getLogger("titan.cortex")
+LOG = logging.getLogger("lcme.cortex")
 
 # Origin indices for MIS one-hot encoding
 _ORIGIN_MAP = {"user": 0, "code": 1, "inference": 2, "observation": 3, "memory": 4}
@@ -219,15 +219,15 @@ def _apply_weight_decay(module, decay: float = 5e-5):
 
 
 # ---------------------------------------------------------------------------
-# TitanCortex orchestrator
+# LCMECortex orchestrator
 # ---------------------------------------------------------------------------
 
-class TitanCortex:
-    """Matrix of 6 micro-networks that make Titan a living memory system."""
+class LCMECortex:
+    """Matrix of 6 micro-networks that make LCME a living memory system."""
 
     def __init__(self, db_path: Optional[Path] = None, model_path: Optional[Path] = None):
         if not HAS_TORCH:
-            raise RuntimeError("PyTorch required for TitanCortex")
+            raise RuntimeError("PyTorch required for LCMECortex")
 
         self._db_path = db_path
         self._model_path = model_path
@@ -260,7 +260,7 @@ class TitanCortex:
         self._init_tables()
         self._set_eval_mode()
 
-        LOG.info("TitanCortex initialized -- %d total parameters",
+        LOG.info("LCMECortex initialized -- %d total parameters",
                  self.param_count())
 
         self._maybe_synthetic_warmup()
@@ -847,13 +847,13 @@ class TitanCortex:
 # Singleton
 # ---------------------------------------------------------------------------
 
-_cortex: Optional[TitanCortex] = None
+_cortex: Optional[LCMECortex] = None
 _cortex_lock = threading.Lock()
 
 
 def get_cortex(db_path: Optional[Path] = None,
-               model_path: Optional[Path] = None) -> Optional[TitanCortex]:
-    """Get or create the TitanCortex singleton. Returns None if torch unavailable."""
+               model_path: Optional[Path] = None) -> Optional[LCMECortex]:
+    """Get or create the LCMECortex singleton. Returns None if torch unavailable."""
     global _cortex
     if not HAS_TORCH:
         return None
@@ -861,10 +861,10 @@ def get_cortex(db_path: Optional[Path] = None,
         with _cortex_lock:
             if _cortex is None:
                 try:
-                    _cortex = TitanCortex(db_path=db_path, model_path=model_path)
+                    _cortex = LCMECortex(db_path=db_path, model_path=model_path)
                     atexit.register(_cortex.close)
                 except Exception as e:
-                    LOG.warning("TitanCortex init failed: %s", e)
+                    LOG.warning("LCMECortex init failed: %s", e)
                     return None
     return _cortex
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Titan Memory Benchmark Suite
-Empirical comparison: Titan vs Mem0 vs Letta vs Graphiti
+LCME Memory Benchmark Suite
+Empirical comparison: LCME vs Mem0 vs Letta vs Graphiti
 """
 import gc
 import json
@@ -141,14 +141,14 @@ def dir_size_mb(path):
                 total += f.stat().st_size
     return total / 1e6
 
-# ── Titan ───────────────────────────────────────────────────────
-def bench_titan(data, queries, tmpdir):
+# ── LCME ───────────────────────────────────────────────────────
+def bench_lcme(data, queries, tmpdir):
     results = {}
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from titan import Titan, TitanConfig
+    from lcme import LCME, LCMEConfig
 
     t0 = time.monotonic()
-    mem = Titan(TitanConfig(data_dir=os.path.join(tmpdir, "titan")))
+    mem = LCME(LCMEConfig(data_dir=os.path.join(tmpdir, "lcme")))
     mem.ingest("warmup", origin="user")
     _ = mem.retrieve("warmup")
     results["cold_start_s"] = round(time.monotonic() - t0, 3)
@@ -169,7 +169,7 @@ def bench_titan(data, queries, tmpdir):
 
     rss_after = measure_rss_mb()
     results["ram_delta_mb"] = round(rss_after - rss_before, 1)
-    results["disk_mb"] = round(dir_size_mb(os.path.join(tmpdir, "titan")), 2)
+    results["disk_mb"] = round(dir_size_mb(os.path.join(tmpdir, "lcme")), 2)
 
     latencies = []
     for q, _ in queries:
@@ -199,8 +199,8 @@ def bench_titan(data, queries, tmpdir):
 
     stats_before = mem.get_stats()
     del mem; gc.collect()
-    from titan.core import reset_titan; reset_titan()
-    mem2 = Titan(TitanConfig(data_dir=os.path.join(tmpdir, "titan")))
+    from lcme.core import reset_lcme; reset_lcme()
+    mem2 = LCME(LCMEConfig(data_dir=os.path.join(tmpdir, "lcme")))
     stats_after = mem2.get_stats()
     results["persistence"] = stats_before["nodes"] == stats_after["nodes"]
 
@@ -212,7 +212,7 @@ def bench_titan(data, queries, tmpdir):
 
     results["neural_params"] = 0
     try:
-        from titan.neural_cortex import get_cortex
+        from lcme.neural_cortex import get_cortex
         c = get_cortex(); results["neural_params"] = c.param_count() if c else 0
     except: pass
 
@@ -335,7 +335,7 @@ def bench_letta(data, queries, tmpdir):
 def main():
     hw = get_hw_info()
     print("=" * 70)
-    print("  TITAN MEMORY BENCHMARK SUITE")
+    print("  LCME MEMORY BENCHMARK SUITE")
     print(f"  {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"  CPU: {hw.get('cpu', '?')} | RAM: {hw.get('ram_gb', '?')}GB | Python: {hw.get('python', '?')}")
     print("=" * 70)
@@ -345,10 +345,10 @@ def main():
     print(f"  {len(data)} test items, {len(queries)} labeled queries\n")
 
     all_results = {"hardware": hw, "timestamp": time.strftime('%Y-%m-%dT%H:%M:%S')}
-    tmpdir = tempfile.mkdtemp(prefix="titan_bench_")
+    tmpdir = tempfile.mkdtemp(prefix="lcme_bench_")
 
     try:
-        for name, fn in [("titan", bench_titan), ("mem0", bench_mem0),
+        for name, fn in [("lcme", bench_lcme), ("mem0", bench_mem0),
                           ("graphiti", bench_graphiti), ("letta", bench_letta)]:
             print(f"\n{'='*70}\n  BENCHMARKING: {name.upper()}\n{'='*70}")
             r = fn(data, queries, tmpdir)
@@ -386,11 +386,11 @@ def main():
         ("Persistence", "persistence"),
         ("Contradiction", "contradiction_has_update"),
     ]
-    print(f"\n  {'Metric':<22} {'Titan':>12} {'Mem0':>12} {'Graphiti':>12} {'Letta':>12}")
+    print(f"\n  {'Metric':<22} {'LCME':>12} {'Mem0':>12} {'Graphiti':>12} {'Letta':>12}")
     print("  " + "-" * 70)
     for label, key in metrics:
         row = f"  {label:<22}"
-        for s in ["titan", "mem0", "graphiti", "letta"]:
+        for s in ["lcme", "mem0", "graphiti", "letta"]:
             v = all_results.get(s, {}).get(key, "N/A")
             if isinstance(v, bool): v = "Yes" if v else "No"
             row += f" {str(v):>12}"

@@ -1,5 +1,5 @@
 """
-Titan - Neural-Enhanced Conversational Memory for AI Agents
+L.C.M.E. — Local Cognitive Memory Engine
 
 A local, deterministic context, memory, and retrieval system featuring:
 - Tri-hybrid storage: SQLite + Vector Store + Knowledge Graph
@@ -10,10 +10,10 @@ A local, deterministic context, memory, and retrieval system featuring:
 
 Quick start::
 
-    from titan import Titan, TitanConfig
+    from lcme import LCME, LCMEConfig
 
-    config = TitanConfig(data_dir="./my_memory")
-    memory = Titan(config)
+    config = LCMEConfig(data_dir="./my_memory")
+    memory = LCME(config)
 
     memory.ingest("Alice works at a startup in Berlin.", origin="user")
     results = memory.retrieve("What do we know about Alice?")
@@ -21,23 +21,23 @@ Quick start::
 
 Convenience functions (use a global singleton)::
 
-    from titan import remember, recall, get_context, forget, protect
+    from lcme import remember, recall, get_context, forget, protect
 
     remember("The user prefers dark mode.")
     results = recall("user preferences")
 """
 
 __version__ = "1.0.0"
-__codename__ = "Titan"
+__codename__ = "LCME"
 
-from .core import Titan, TitanConfig, get_titan, reset_titan
+from .core import LCME, LCMEConfig, get_lcme, reset_lcme
 from .core import remember, recall, get_context, forget, protect
 
 __all__ = [
-    "Titan",
-    "TitanConfig",
-    "get_titan",
-    "reset_titan",
+    "LCME",
+    "LCMEConfig",
+    "get_lcme",
+    "reset_lcme",
     "remember",
     "recall",
     "get_context",

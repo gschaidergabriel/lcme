@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Titan Storage Layer - Tri-Hybrid Architecture
+LCME Storage Layer - Tri-Hybrid Architecture
 
 Components:
 1. SQLite (The Ledger) - Deterministic facts & indexes
@@ -25,12 +25,12 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import numpy as np
 
-LOG = logging.getLogger("titan.storage")
+LOG = logging.getLogger("lcme.storage")
 
 # ---------------------------------------------------------------------------
-# Default paths (overridden by TitanConfig.data_dir)
+# Default paths (overridden by LCMEConfig.data_dir)
 # ---------------------------------------------------------------------------
-_DEFAULT_DATA_DIR = Path.home() / ".titan" / "data"
+_DEFAULT_DATA_DIR = Path.home() / ".lcme" / "data"
 
 
 def _ensure_dir(p: Path) -> Path:
@@ -598,9 +598,9 @@ class VectorStore:
         self._model = None
         self._vectors: Dict[str, np.ndarray] = {}
         self._lock = threading.Lock()
-        self._index_file = data_dir / "titan_vectors.npz"
-        self._ids_file = data_dir / "titan_vector_ids.json"
-        self._hnsw_file = data_dir / "titan_hnsw.bin"
+        self._index_file = data_dir / "lcme_vectors.npz"
+        self._ids_file = data_dir / "lcme_vector_ids.json"
+        self._hnsw_file = data_dir / "lcme_hnsw.bin"
         # HNSW index (lazy-built when corpus exceeds threshold)
         self._hnsw_index = None
         self._hnsw_id_list: List[str] = []  # position → node_id
@@ -855,7 +855,7 @@ class TriHybridStorage:
 
     def __init__(self, data_dir: Path, vector_model: str = "all-MiniLM-L6-v2"):
         _ensure_dir(data_dir)
-        self.sqlite = SQLiteStore(data_dir / "titan.db")
+        self.sqlite = SQLiteStore(data_dir / "lcme.db")
         self.vectors = VectorStore(data_dir, vector_model)
         self.graph = KnowledgeGraph(self.sqlite)
         LOG.info("Tri-Hybrid Storage initialized")

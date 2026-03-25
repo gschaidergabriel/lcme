@@ -1,6 +1,6 @@
-# Titan Memory -- Integration Guide
+# LCME Memory -- Integration Guide
 
-How to add Titan to your local AI agent. All examples use **3B-8B models running on consumer hardware** via Ollama, llama.cpp, or compatible local inference servers.
+How to add LCME to your local AI agent. All examples use **3B-8B models running on consumer hardware** via Ollama, llama.cpp, or compatible local inference servers.
 
 ## Table of Contents
 
@@ -15,16 +15,16 @@ How to add Titan to your local AI agent. All examples use **3B-8B models running
 
 ## Universal Pattern
 
-There are two ways to wire Titan into any agent. Both work with any model, any framework.
+There are two ways to wire LCME into any agent. Both work with any model, any framework.
 
 ### Pattern A: System Prompt Injection (Recommended for Small Models)
 
 Before each LLM call, retrieve relevant memories and prepend them to the system message. The model sees the context without needing tool-calling support. This is the most reliable approach for 3B-8B models where tool calling can be unreliable.
 
 ```python
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
-memory = Titan(TitanConfig(data_dir="./memory"))
+memory = LCME(LCMEConfig(data_dir="./memory"))
 
 # Before each LLM call:
 context = memory.get_context_string(user_message)
@@ -80,7 +80,7 @@ The most common local LLM setup. Works with any model Ollama supports.
 
 **Install:**
 ```bash
-pip install ollama titan-memory
+pip install ollama lcme
 ```
 
 **Models tested:** `qwen2.5:3b`, `llama3.1:8b`, `phi3:3.8b`, `gemma2:2b`, `mistral:7b`
@@ -92,9 +92,9 @@ Full example: [`examples/ollama_chat.py`](../examples/ollama_chat.py)
 ```python
 import re
 import ollama
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
-memory = Titan(TitanConfig(data_dir="./agent_memory"))
+memory = LCME(LCMEConfig(data_dir="./agent_memory"))
 
 def chat(user_message: str, history: list = None) -> str:
     if history is None:
@@ -140,9 +140,9 @@ Only use this if your model reliably handles tool calling.
 
 ```python
 import ollama
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
-memory = Titan(TitanConfig(data_dir="./agent_memory"))
+memory = LCME(LCMEConfig(data_dir="./agent_memory"))
 
 tools = [
     {"type": "function", "function": {
@@ -188,7 +188,7 @@ def chat(user_message: str) -> str:
 ```
 
 **Notes:**
-- Context window varies by model (4K-32K). Memory context eats into it. Keep `max_context_length` in TitanConfig appropriate for your model.
+- Context window varies by model (4K-32K). Memory context eats into it. Keep `max_context_length` in LCMEConfig appropriate for your model.
 - `ollama.chat()` is synchronous. Use `ollama.AsyncClient` for async.
 - Tool calling reliability: Qwen2.5 > Llama3.1 > Mistral > Phi-3 > Gemma.
 
@@ -200,7 +200,7 @@ If you run models directly via llama-server (llama.cpp's built-in HTTP server), 
 
 **Install:**
 ```bash
-pip install openai titan-memory
+pip install openai lcme
 ```
 
 **Start your model:**
@@ -213,9 +213,9 @@ Full example: [`examples/openai_compatible.py`](../examples/openai_compatible.py
 ```python
 import json
 from openai import OpenAI
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
-memory = Titan(TitanConfig(data_dir="./agent_memory"))
+memory = LCME(LCMEConfig(data_dir="./agent_memory"))
 
 client = OpenAI(
     base_url="http://localhost:8080/v1",
@@ -255,7 +255,7 @@ LangChain with a local model via Ollama or llama.cpp.
 
 **Install:**
 ```bash
-pip install langchain langchain-community titan-memory
+pip install langchain langchain-community lcme
 ```
 
 ### Custom Memory Class
@@ -266,13 +266,13 @@ from langchain_core.memory import BaseMemory
 from langchain_community.llms import Ollama
 from langchain_core.prompts import PromptTemplate
 from langchain.chains import ConversationChain
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
-class TitanMemory(BaseMemory):
-    """LangChain memory backed by Titan."""
+class LCMEMemory(BaseMemory):
+    """LangChain memory backed by LCME."""
 
-    titan: Any = None
-    memory_key: str = "titan_context"
+    lcme: Any = None
+    memory_key: str = "lcme_context"
     input_key: str = "input"
 
     class Config:
@@ -280,7 +280,7 @@ class TitanMemory(BaseMemory):
 
     def __init__(self, data_dir: str = "./lc_memory", **kwargs):
         super().__init__(**kwargs)
-        self.titan = Titan(TitanConfig(data_dir=data_dir))
+        self.lcme = LCME(LCMEConfig(data_dir=data_dir))
 
     @property
     def memory_variables(self) -> List[str]:
@@ -288,33 +288,33 @@ class TitanMemory(BaseMemory):
 
     def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, str]:
         query = inputs.get(self.input_key, "")
-        context = self.titan.get_context_string(query) if query else ""
+        context = self.lcme.get_context_string(query) if query else ""
         return {self.memory_key: context}
 
     def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, str]) -> None:
         user_input = inputs.get(self.input_key, "")
         ai_output = outputs.get("response", outputs.get("output", ""))
         if user_input:
-            self.titan.ingest(f"User: {user_input}", origin="user")
+            self.lcme.ingest(f"User: {user_input}", origin="user")
         if ai_output:
-            self.titan.ingest(f"Assistant: {ai_output}", origin="observation")
+            self.lcme.ingest(f"Assistant: {ai_output}", origin="observation")
 
     def clear(self) -> None:
-        self.titan.run_maintenance()
+        self.lcme.run_maintenance()
 
 
 # Usage with local Ollama model
-memory = TitanMemory(data_dir="./lc_memory")
+memory = LCMEMemory(data_dir="./lc_memory")
 llm = Ollama(model="qwen2.5:3b")
 
 template = """You are a helpful assistant with long-term memory.
 
-{titan_context}
+{lcme_context}
 Current conversation:
 Human: {input}
 AI:"""
 
-prompt = PromptTemplate(input_variables=["input", "titan_context"], template=template)
+prompt = PromptTemplate(input_variables=["input", "lcme_context"], template=template)
 chain = ConversationChain(llm=llm, memory=memory, prompt=prompt)
 
 result = chain.invoke({"input": "My name is Alex, I work on robotics."})
@@ -330,25 +330,25 @@ print(result["response"])
 ## LlamaIndex + Local Model
 
 ```bash
-pip install llama-index llama-index-llms-ollama titan-memory
+pip install llama-index llama-index-llms-ollama lcme
 ```
 
 ```python
 from llama_index.llms.ollama import Ollama
 from llama_index.core.tools import FunctionTool
 from llama_index.core.agent import ReActAgent
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
-titan = Titan(TitanConfig(data_dir="./li_memory"))
+lcme = LCME(LCMEConfig(data_dir="./li_memory"))
 
 def memory_store(text: str) -> str:
     """Store information in long-term memory."""
-    result = titan.ingest(text, origin="user")
+    result = lcme.ingest(text, origin="user")
     return f"Stored: {result['claims']} claims"
 
 def memory_recall(query: str) -> str:
     """Search long-term memory for relevant information."""
-    return titan.get_context_string(query)
+    return lcme.get_context_string(query)
 
 tools = [
     FunctionTool.from_defaults(fn=memory_store),
@@ -372,9 +372,9 @@ The simplest integration. No framework, no dependencies beyond `requests`.
 
 ```python
 import requests
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
-memory = Titan(TitanConfig(data_dir="./memory"))
+memory = LCME(LCMEConfig(data_dir="./memory"))
 
 LLAMA_URL = "http://localhost:8080/v1/chat/completions"  # llama-server
 
@@ -419,7 +419,7 @@ print(chat("What project am I working on?", history))
 |-------------|-------|---------|-------------|
 | **Ollama** | Any Ollama model | `pip install ollama` | System prompt injection |
 | **llama-server** | Any GGUF | `pip install openai` | System prompt injection |
-| **LangChain** | Ollama / LlamaCpp | `pip install langchain langchain-community` | TitanMemory class |
+| **LangChain** | Ollama / LlamaCpp | `pip install langchain langchain-community` | LCMEMemory class |
 | **LlamaIndex** | Ollama | `pip install llama-index llama-index-llms-ollama` | FunctionTool |
 | **Raw Python** | Any HTTP endpoint | `pip install requests` | System prompt injection |
 

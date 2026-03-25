@@ -1,10 +1,10 @@
 <p align="center">
-  <h1 align="center">TITAN</h1>
-  <p align="center">Conversational memory for AI agents.<br>Local. Trainable. Zero dependencies.</p>
+  <h1 align="center">L.C.M.E.</h1>
+  <p align="center"><b>Local Cognitive Memory Engine</b><br>Conversational memory for AI agents. Local. Trainable. Zero dependencies.</p>
 </p>
 
 <p align="center">
-  <a href="https://github.com/gschaidergabriel/titan-memory/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/gschaidergabriel/lcme/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="https://pytorch.org/"><img src="https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c.svg" alt="PyTorch 2.0+"></a>
   <img src="https://img.shields.io/badge/dependencies-zero%20external-brightgreen.svg" alt="Zero External Dependencies">
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/05_comparison.png" alt="Titan vs Mem0 on constrained hardware" width="100%">
+  <img src="assets/05_comparison.png" alt="LCME vs Mem0 on constrained hardware" width="100%">
 </p>
 
 ---
@@ -23,16 +23,16 @@ You're running a 3B-8B model locally on consumer hardware (CPU-only, 8-16 GB RAM
 
 ## The Solution
 
-Titan gives AI agents long-term memory **without requiring an LLM for memory operations**. It uses regex extraction, 10 small neural networks (303K params total, <1ms inference), and multi-signal retrieval to store and recall memories at 28ms per ingest and 14ms per query. No second model. No API keys. No external servers. Just `pip install` and it works on the same hardware your 3B model already runs on.
+LCME gives AI agents long-term memory **without requiring an LLM for memory operations**. It uses regex extraction, 10 small neural networks (303K params total, <1ms inference), and multi-signal retrieval to store and recall memories at 28ms per ingest and 14ms per query. No second model. No API keys. No external servers. Just `pip install` and it works on the same hardware your 3B model already runs on.
 
 ```
 Your agent (Qwen-3B, Llama-8B, Phi-3, Gemma...)
     │
-    ├── ingest() ──→  Titan (28ms, +17MB RAM, CPU)
+    ├── ingest() ──→  LCME (28ms, +17MB RAM, CPU)
     │                   └── regex extraction + neural scoring
     │                   └── SQLite + vectors + knowledge graph
     │
-    └── retrieve() ←── Titan (14ms)
+    └── retrieve() ←── LCME (14ms)
                         └── keyword + semantic + graph fusion
                         └── learned neural re-ranking
 ```
@@ -49,12 +49,12 @@ Your agent (Qwen-3B)           ← already using most of your RAM/CPU
     └── retrieve() ←── Mem0 (vector-only search)
 ```
 
-On a machine running a 3B model, you can't afford to call that model a second time for every memory operation. Titan's 303K-param networks do the job in <1ms.
+On a machine running a 3B model, you can't afford to call that model a second time for every memory operation. LCME's 303K-param networks do the job in <1ms.
 
 ```python
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
-memory = Titan(TitanConfig(data_dir="./memory"))
+memory = LCME(LCMEConfig(data_dir="./memory"))
 
 memory.ingest("Alice is a backend engineer at Google.", origin="user")
 memory.ingest("The auth service runs on port 8080.", origin="user")
@@ -69,7 +69,7 @@ context = memory.get_context_string("Tell me about the auth service")
 ## How It Works
 
 <p align="center">
-  <img src="assets/04_architecture.png" alt="Titan Architecture" width="100%">
+  <img src="assets/04_architecture.png" alt="LCME Architecture" width="100%">
 </p>
 
 <details>
@@ -111,7 +111,7 @@ flowchart LR
 
 ## What the Neural Networks Actually Do
 
-Titan has 10 small PyTorch networks (~303K parameters total) that run on CPU in <1ms per call. They start with rule-based defaults and gradually take over as they accumulate training data.
+LCME has 10 small PyTorch networks (~303K parameters total) that run on CPU in <1ms per call. They start with rule-based defaults and gradually take over as they accumulate training data.
 
 ```mermaid
 flowchart TB
@@ -139,16 +139,16 @@ flowchart TB
 ## Benchmarks
 
 > [!NOTE]
-> Benchmarked for the target scenario: **local agents on consumer hardware (CPU-only, 8-16GB RAM) running 3B-8B models.** This is not a benchmark for cloud deployments with 70B+ models and unlimited API budgets. Titan is built for the machine that's already at capacity running your agent.
+> Benchmarked for the target scenario: **local agents on consumer hardware (CPU-only, 8-16GB RAM) running 3B-8B models.** This is not a benchmark for cloud deployments with 70B+ models and unlimited API budgets. LCME is built for the machine that's already at capacity running your agent.
 
-**Hardware:** AMD Ryzen 9 7940HS, 24.4 GB RAM, CPU-only. Titan: 30 items, 20 queries, 3 runs averaged. Mem0: 200 items, 15 queries, local Qwen-3B via llama.cpp. Graphiti/Letta: could not run (require Neo4j / Letta server).
+**Hardware:** AMD Ryzen 9 7940HS, 24.4 GB RAM, CPU-only. LCME: 30 items, 20 queries, 3 runs averaged. Mem0: 200 items, 15 queries, local Qwen-3B via llama.cpp. Graphiti/Letta: could not run (require Neo4j / Letta server).
 
 <p align="center">
   <img src="assets/01_ingest_speed.png" alt="Ingest Speed" width="48%">
   <img src="assets/02_retrieval_quality.png" alt="Retrieval Quality" width="48%">
 </p>
 
-**Scalability (Titan, tested at 100 / 500 / 1000 items, 15 queries):**
+**Scalability (LCME, tested at 100 / 500 / 1000 items, 15 queries):**
 
 | Items | P@1 | P@5 | MRR | Ingest/item | Retrieval P50 | Disk |
 |-------|-----|-----|-----|-------------|---------------|------|
@@ -160,7 +160,7 @@ Concurrent access (1 writer + 2 readers): 0 errors.
 
 **Head-to-head vs Mem0 (at 1000 items):**
 
-| Metric | **Titan** | Mem0 v1.0.7 | Graphiti v0.28 | Letta v0.16 |
+| Metric | **LCME** | Mem0 v1.0.7 | Graphiti v0.28 | Letta v0.16 |
 |--------|-----------|-------------|----------------|-------------|
 | Precision@5 | **1.000** | 0.867 | needs Neo4j | needs server |
 | MRR | **1.000** | 0.800 | " | " |
@@ -182,20 +182,20 @@ Concurrent access (1 writer + 2 readers): 0 errors.
 | Write throughput | 8.8 items/sec |
 | Memory growth (1000 items) | +77 MB RAM, 3.6 MB disk |
 
-**Why this matters on 3B hardware:** Mem0's 11.8s per ingest means your Qwen-3B is busy doing memory extraction instead of responding to the user. On a single-model machine, memory and inference compete for the same compute. Titan's ingest runs between calls without the user noticing.
+**Why this matters on 3B hardware:** Mem0's 11.8s per ingest means your Qwen-3B is busy doing memory extraction instead of responding to the user. On a single-model machine, memory and inference compete for the same compute. LCME's ingest runs between calls without the user noticing.
 
 Full methodology: **[Benchmark Paper](docs/BENCHMARK.md)**.
 
 ## Installation
 
 ```bash
-pip install titan-memory
+pip install lcme
 ```
 
 ```bash
 # Or from source
-git clone https://github.com/gschaidergabriel/titan-memory.git
-cd titan-memory
+git clone https://github.com/gschaidergabriel/lcme.git
+cd lcme
 pip install -e .
 ```
 
@@ -207,9 +207,9 @@ pip install -e .
 ### Core
 
 ```python
-from titan import Titan, TitanConfig
+from lcme import LCME, LCMEConfig
 
-config = TitanConfig(
+config = LCMEConfig(
     data_dir="./memory",          # Where to store everything
     vector_model="all-MiniLM-L6-v2",  # Embedding model
     default_limit=5,              # Results per query
@@ -217,7 +217,7 @@ config = TitanConfig(
     auto_consolidation=False,     # Set True for automatic neural training
     consolidation_interval_hours=6.0,
 )
-memory = Titan(config)
+memory = LCME(config)
 ```
 
 | Method | Returns | Description |
@@ -234,9 +234,9 @@ memory = Titan(config)
 ### Convenience Functions
 
 ```python
-from titan import remember, recall, get_context, forget, protect
+from lcme import remember, recall, get_context, forget, protect
 
-remember("The user prefers dark mode.")        # Global singleton, ~/.titan/data/
+remember("The user prefers dark mode.")        # Global singleton, ~/.lcme/data/
 results = recall("user preferences")
 context = get_context("What does the user like?")
 ```
@@ -291,14 +291,14 @@ Full guide: **[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)**
 ## Data Storage
 
 ```
-~/.titan/data/
-├── titan.db              # SQLite: nodes, edges, events, claims, FTS5 index
-├── titan_vectors.npz     # Compressed embeddings (384-dim per memory)
-├── titan_vector_ids.json # Node-to-vector mapping
+~/.lcme/data/
+├── lcme.db              # SQLite: nodes, edges, events, claims, FTS5 index
+├── lcme_vectors.npz     # Compressed embeddings (384-dim per memory)
+├── lcme_vector_ids.json # Node-to-vector mapping
 ├── hippocampus.db        # Retrieval training logs
 └── models/
-    ├── titan_cortex.pt       # Cortex checkpoint (6 networks)
-    └── titan_hippocampus.pt  # Hippocampus checkpoint (4 networks)
+    ├── lcme_cortex.pt       # Cortex checkpoint (6 networks)
+    └── lcme_hippocampus.pt  # Hippocampus checkpoint (4 networks)
 ```
 
 ## License
