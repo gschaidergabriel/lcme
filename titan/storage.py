@@ -569,12 +569,27 @@ class SQLiteStore:
 # VectorStore
 # ---------------------------------------------------------------------------
 
+_HAS_HNSWLIB = False
+try:
+    import hnswlib
+    _HAS_HNSWLIB = True
+except ImportError:
+    pass
+
+# Threshold: use HNSW index above this many vectors
+_HNSW_THRESHOLD = 500
+_HNSW_EF_CONSTRUCTION = 200
+_HNSW_M = 16
+_HNSW_EF_SEARCH = 100
+
+
 class VectorStore:
     """
     Vector Store - The Semantic Field
 
-    Meaning search, not truth.
-    Uses all-MiniLM-L6-v2 by default.
+    Uses HNSW (hnswlib) for O(log n) approximate nearest neighbor search
+    when available and corpus > 500 items. Falls back to brute-force
+    cosine similarity otherwise. Both produce identical results at small scale.
     """
 
     def __init__(self, data_dir: Path, model_name: str = "all-MiniLM-L6-v2"):
@@ -585,6 +600,11 @@ class VectorStore:
         self._lock = threading.Lock()
         self._index_file = data_dir / "titan_vectors.npz"
         self._ids_file = data_dir / "titan_vector_ids.json"
+        self._hnsw_file = data_dir / "titan_hnsw.bin"
+        # HNSW index (lazy-built when corpus exceeds threshold)
+        self._hnsw_index = None
+        self._hnsw_id_list: List[str] = []  # position → node_id
+        self._hnsw_dirty = False
         _ensure_dir(data_dir)
         self._load_index()
 
@@ -608,6 +628,9 @@ class VectorStore:
                     if i < len(vectors):
                         self._vectors[node_id] = vectors[i]
                 LOG.debug(f"Loaded {len(self._vectors)} vectors from disk")
+                # Rebuild HNSW if we have enough vectors
+                if _HAS_HNSWLIB and len(self._vectors) >= _HNSW_THRESHOLD:
+                    self._rebuild_hnsw()
         except Exception as e:
             LOG.warning(f"Failed to load vector index: {e}")
 
@@ -618,13 +641,43 @@ class VectorStore:
                 if not self._vectors:
                     return
                 if not self._data_dir.exists():
-                    return  # Directory cleaned up (e.g., temp dir in tests)
+                    return
                 ids = list(self._vectors.keys())
                 vectors = np.array([self._vectors[i] for i in ids])
                 np.savez_compressed(str(self._index_file), vectors=vectors)
                 self._ids_file.write_text(json.dumps(ids))
+                # Save HNSW index if it exists
+                if self._hnsw_index is not None:
+                    self._hnsw_index.save_index(str(self._hnsw_file))
         except Exception as e:
             LOG.error(f"Failed to save vector index: {e}")
+
+    def _rebuild_hnsw(self):
+        """Build/rebuild the HNSW index from current vectors."""
+        if not _HAS_HNSWLIB or len(self._vectors) < _HNSW_THRESHOLD:
+            return
+        try:
+            ids = list(self._vectors.keys())
+            vecs = np.array([self._vectors[i] for i in ids], dtype=np.float32)
+            # Normalize for cosine similarity (HNSW uses inner product on normalized vecs)
+            norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+            norms[norms == 0] = 1
+            vecs_normed = vecs / norms
+
+            dim = vecs_normed.shape[1]
+            index = hnswlib.Index(space='ip', dim=dim)  # inner product on normalized = cosine
+            index.init_index(max_elements=max(len(ids) * 2, 1000),
+                             ef_construction=_HNSW_EF_CONSTRUCTION, M=_HNSW_M)
+            index.add_items(vecs_normed, list(range(len(ids))))
+            index.set_ef(_HNSW_EF_SEARCH)
+
+            self._hnsw_index = index
+            self._hnsw_id_list = ids
+            self._hnsw_dirty = False
+            LOG.info(f"HNSW index built: {len(ids)} vectors, dim={dim}")
+        except Exception as e:
+            LOG.warning(f"HNSW build failed, using brute-force: {e}")
+            self._hnsw_index = None
 
     def embed(self, text: str) -> np.ndarray:
         """Generate embedding for text."""
@@ -636,39 +689,58 @@ class VectorStore:
         with self._lock:
             vector = self.embed(text)
             self._vectors[node_id] = vector
-        # Periodically save
-        if len(self._vectors) % 100 == 0:
+            self._hnsw_dirty = True
+        # Periodically save + rebuild HNSW
+        n = len(self._vectors)
+        if n % 100 == 0:
             self._save_index()
+        if _HAS_HNSWLIB and self._hnsw_dirty and n >= _HNSW_THRESHOLD and n % _HNSW_THRESHOLD == 0:
+            self._rebuild_hnsw()
 
     def remove(self, node_id: str):
         """Remove vector for a node."""
         with self._lock:
             self._vectors.pop(node_id, None)
+            self._hnsw_dirty = True
 
     def search(self, query: str, limit: int = 10) -> List[Tuple[str, float]]:
         """
-        Search for similar vectors.
-        Returns (node_id, similarity) pairs.
+        Search for similar vectors. Uses HNSW O(log n) when available
+        and corpus is large enough, otherwise brute-force O(n).
+        Returns (node_id, cosine_similarity) pairs, descending.
         """
         if not self._vectors:
             return []
 
         query_vec = self.embed(query)
 
+        # Try HNSW first (O(log n) for large corpora)
+        if (self._hnsw_index is not None and not self._hnsw_dirty
+                and len(self._hnsw_id_list) > 0):
+            try:
+                q_norm = query_vec / (np.linalg.norm(query_vec) + 1e-8)
+                q_norm = q_norm.astype(np.float32).reshape(1, -1)
+                labels, distances = self._hnsw_index.knn_query(q_norm, k=min(limit, len(self._hnsw_id_list)))
+                results = []
+                for idx, dist in zip(labels[0], distances[0]):
+                    if idx < len(self._hnsw_id_list):
+                        # inner product distance on normalized vectors = cosine similarity
+                        results.append((self._hnsw_id_list[idx], float(dist)))
+                return results
+            except Exception as e:
+                LOG.debug(f"HNSW search failed, falling back to brute-force: {e}")
+
+        # Brute-force fallback (O(n), always correct)
         with self._lock:
             ids = list(self._vectors.keys())
             vectors = np.array([self._vectors[i] for i in ids])
 
-        # Cosine similarity
         norms = np.linalg.norm(vectors, axis=1) * np.linalg.norm(query_vec)
-        norms[norms == 0] = 1  # Avoid division by zero
+        norms[norms == 0] = 1
         similarities = np.dot(vectors, query_vec) / norms
 
-        # Get top results
         top_indices = np.argsort(similarities)[::-1][:limit]
-        results = [(ids[i], float(similarities[i])) for i in top_indices]
-
-        return results
+        return [(ids[i], float(similarities[i])) for i in top_indices]
 
     def save(self):
         """Force save index."""
@@ -679,6 +751,7 @@ class VectorStore:
         return {
             "vectors": len(self._vectors),
             "model": self.model_name,
+            "index": "hnsw" if self._hnsw_index is not None else "brute-force",
         }
 
 
