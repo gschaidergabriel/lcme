@@ -240,25 +240,19 @@ FTS stop-word filtering, temporal detection, emotion detection, and negation det
 
 The embedding model (`all-MiniLM-L6-v2`) supports 100+ languages for semantic similarity.
 
-## Framework Integrations
+## Integrations
 
-Two universal patterns work with any LLM:
+All examples use local 3B-8B models. System prompt injection is recommended for small models — tool calling is unreliable below 7B.
 
-1. **System prompt injection** -- call `memory.get_context_string(query)` before each LLM call and prepend the result to the system message.
-2. **Tool-based** -- give the LLM `memory_store` / `memory_recall` tools.
+| Setup | Models | Example | Guide |
+|-------|--------|---------|-------|
+| **Ollama** | qwen2.5:3b, llama3.1:8b, phi3, gemma2 | [`examples/ollama_chat.py`](examples/ollama_chat.py) | [Guide](docs/INTEGRATIONS.md#ollama--python) |
+| **llama-server** | Any GGUF | [`examples/openai_compatible.py`](examples/openai_compatible.py) | [Guide](docs/INTEGRATIONS.md#llama-cpp--llama-server) |
+| **LangChain** | Ollama / LlamaCpp | [`examples/langchain_memory.py`](examples/langchain_memory.py) | [Guide](docs/INTEGRATIONS.md#langchain--local-model) |
+| **LlamaIndex** | Ollama | -- | [Guide](docs/INTEGRATIONS.md#llamaindex--local-model) |
+| **Raw Python** | Any HTTP endpoint | -- | [Guide](docs/INTEGRATIONS.md#raw-python-no-framework) |
 
-| Framework | Example | Guide |
-|-----------|---------|-------|
-| Claude API | [`examples/claude_api.py`](examples/claude_api.py) | [Guide](docs/INTEGRATIONS.md#claude-api-anthropic-sdk) |
-| Ollama | [`examples/ollama_chat.py`](examples/ollama_chat.py) | [Guide](docs/INTEGRATIONS.md#ollama--python) |
-| OpenAI-compatible | [`examples/openai_compatible.py`](examples/openai_compatible.py) | [Guide](docs/INTEGRATIONS.md#openai-compatible-apis) |
-| LangChain | [`examples/langchain_memory.py`](examples/langchain_memory.py) | [Guide](docs/INTEGRATIONS.md#langchain) |
-| LlamaIndex | -- | [Guide](docs/INTEGRATIONS.md#llamaindex) |
-| CrewAI | -- | [Guide](docs/INTEGRATIONS.md#crewai) |
-| AutoGen v0.4 | -- | [Guide](docs/INTEGRATIONS.md#autogen-v04) |
-| Pydantic AI | -- | [Guide](docs/INTEGRATIONS.md#pydantic-ai) |
-
-Full integration guide with copy-pasteable code: **[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)**
+Full guide: **[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)**
 
 ## Data Storage
 
