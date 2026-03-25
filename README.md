@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/lcme_overview.gif" alt="L.C.M.E. Overview" width="100%">
+  <img src="assets/05_comparison.png" alt="L.C.M.E. vs Mem0 on constrained hardware" width="100%">
 </p>
 
 ---
